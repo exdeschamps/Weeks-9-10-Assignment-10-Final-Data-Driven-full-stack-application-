@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+
+  // Helper functions
+  function unchanged(key) {
+    return (key in resource.data) 
+      && (key in request.resource.data) 
+      && (resource.data[key] == request.resource.data[key]);
+  }
+
+  function isValidAlbum() {
+    let data = request.resource.data;
+    return data.name is string
+      && data.artist is string
+      && data.genre is string
+      && data.releaseYear is number
+      && data.releaseYear >= 1900
+      && data.releaseYear <= 2025;  // Adjust max year as needed
+  }
+
+  function isValidRating() {
+    let data = request.resource.data;
+    return data.rating is number
+      && data.rating >= 1
+      && data.rating <= 5
+      && data.text is string
+      && data.userId is string;
+  }
+
+  match /databases/{database}/documents {
+    // Album rules:
+    //   - Anyone can read albums
+    //   - Authenticated users can create albums
+    //   - Updates allowed if core album info unchanged
+    //   - Updates to ratings-related fields allowed (avgRating, numRatings)
+    //   - Deletes not allowed (default)
+    match /albums/{albumId} {
+      allow read: if true;
+      allow create: if request.auth != null
+                   && isValidAlbum();
+      allow update: if request.auth != null
+                   && (unchanged("name")
+                       && unchanged("artist")
+                       && unchanged("genre")
+                       && unchanged("releaseYear")
+                       || (request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['avgRating', 'numRatings', 'sumRating', 'photo'])));
+      
+      // Rating rules:
+      //   - Anyone can read ratings
+      //   - Authenticated users can create ratings
+      //   - Users can only update their own ratings
+      //   - Deletes not allowed (default)
+      match /ratings/{ratingId} {
+        allow read: if true;
+        allow create: if request.auth != null
+                     && isValidRating()
+                     && request.resource.data.userId == request.auth.uid;
+        allow update: if request.auth != null
+                     && isValidRating()
+                     && request.resource.data.userId == request.auth.uid
+                     && resource.data.userId == request.auth.uid;
+      }
+    }
+  }
+}
