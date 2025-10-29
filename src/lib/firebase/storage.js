@@ -1,11 +1,30 @@
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "./clientApp";
+import { updateAlbumImageReference } from "./albumFirestore";
 
-import { storage } from "@/src/lib/firebase/clientApp";
+export async function updateAlbumImage(albumId, image) {
+  const imageUrl = await uploadImage(albumId, image);
+  await updateAlbumImageReference(albumId, imageUrl);
+  return imageUrl;
+}
 
-import { updateRestaurantImageReference } from "@/src/lib/firebase/firestore";
+async function uploadImage(albumId, image) {
+  const storageRef = ref(storage, `albums/${albumId}/${image.name}`);
+  const uploadTask = uploadBytesResumable(storageRef, image);
 
-// Replace the two functions below
-export async function updateRestaurantImage(restaurantId, image) {}
-
-async function uploadImage(restaurantId, image) {}
-// Replace the two functions above
+  return new Promise((resolve, reject) => {
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        // Progress can be tracked here if needed
+      },
+      (error) => {
+        reject(error);
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        resolve(downloadURL);
+      }
+    );
+  });
+}

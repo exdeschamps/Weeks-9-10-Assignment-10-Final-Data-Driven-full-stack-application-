@@ -1,4 +1,4 @@
-import { generateFakeRestaurantsAndReviews } from "@/src/lib/fakeRestaurants.js";
+import { fakeAlbums, fakeReviews } from '../fakeAlbums.js';
 
 import {
   collection,
